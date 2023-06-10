@@ -15,13 +15,13 @@ using UnityEngine;
 
 namespace SceneSaverBL.Versions.Version6;
 
-internal struct SavedPoolee6 : IContextfulSavedObject<SavedPoolee6, AssetPoolee, PooleeInitializationContext6>
+internal struct SavedPoolee6 : ISavedObject<SavedPoolee6, AssetPoolee>
 {
     // 12 + 12 + 8 = 32
     private Vector3 pos;
     private Vector3 scale;
     private Vector3 rot;
-    private int barcodeIdx;
+    private string barcode;
 
     public Vector3 Position => pos;
     public Quaternion Rotation => Quaternion.Euler(rot);
@@ -52,6 +52,9 @@ internal struct SavedPoolee6 : IContextfulSavedObject<SavedPoolee6, AssetPoolee,
         Vector3 readPos;
         Vector3 readScale;
         Vector3 readRot;
+        ushort barcodeLength;
+        string readBarcode;
+        byte[] barcodeBuffer;
         byte[] buffer = vector3Buffer;
 
         stream.Read(buffer, 0, Const.SizeV3);
@@ -117,10 +120,5 @@ internal struct SavedPoolee6 : IContextfulSavedObject<SavedPoolee6, AssetPoolee,
     public override string ToString()
     {
         return $"SSBL Poolee V6 - Pos = {SaveUtils.ToStr(pos)}; Rot (euler) = {SaveUtils.ToStr(rot)}; Scale = {SaveUtils.ToStr(scale)}; Barcode = {barcode}";
-    }
-
-    public Task<AssetPoolee> Initialize(PooleeInitializationContext6 ctx)
-    {
-        throw new NotImplementedException();
     }
 }
