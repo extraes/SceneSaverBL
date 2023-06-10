@@ -10,9 +10,10 @@ using UnityEngine;
 
 namespace SceneSaverBL.Interfaces;
 
-internal interface ISavedObject<TImplementor, TSavedObject> : IEquatable<TImplementor>, ISerializableStruct<TImplementor> where TImplementor : struct, ISavedObject<TImplementor, TSavedObject>
+internal interface ISavedObject<TImplementor, TSavedObject, TContext> : IEquatable<TImplementor>, ISerializableStruct<TImplementor> 
+    where TImplementor : struct, ISavedObject<TImplementor, TSavedObject, TContext>
 {
     // use blocking calls for Construct because it accesses unity shit
-    public void Construct(TSavedObject prepareToSerialize);
+    public void Construct(TContext context, TSavedObject prepareToSerialize);
     public Task<TSavedObject> Initialize();
 }

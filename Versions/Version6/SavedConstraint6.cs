@@ -16,7 +16,7 @@ using SLZ.Bonelab;
 
 namespace SceneSaverBL.Versions.Version6;
 
-internal struct SavedConstraint6 : ISavedConstraint<SavedConstraint6>
+internal struct SavedConstraint6 : ISavedConstraint<SavedConstraint6, SaveFile6>
 {
     // struct size is 4+4+1+8+8 = 25 -> packed to 32 bytes
     //private readonly Vector3 conAnchor;
@@ -34,12 +34,12 @@ internal struct SavedConstraint6 : ISavedConstraint<SavedConstraint6>
     public void Read(Stream stream)
     {
         byte arrLen;
-        byte[] buffer4 = new byte[sizeof(uint)];
+        byte[] buffer4 = new byte[sizeof(int)];
 
         constraintMode = (byte)stream.ReadByte();
-        stream.Read(buffer4, 0, sizeof(uint));
+        stream.Read(buffer4, 0, sizeof(int));
         firstObjectIndex = BitConverter.ToInt32(buffer4, 0);
-        stream.Read(buffer4, 0, sizeof(uint));
+        stream.Read(buffer4, 0, sizeof(int));
         secondObjectIndex = BitConverter.ToInt32(buffer4, 0);
 
         arrLen = (byte)stream.ReadByte();
@@ -51,7 +51,7 @@ internal struct SavedConstraint6 : ISavedConstraint<SavedConstraint6>
         stream.Read(childIndicesToSecond, 0, childIndicesToSecond.Length);
     }
 
-    public void Construct(AssetPoolee[] poolees, ConstraintTracker tracker)
+    public void Construct(SaveFile6 originSave, AssetPoolee[] poolees, ConstraintTracker tracker)
     {
         //conAnchor = tracker.joint.connectedAnchor;
         constraintMode = (byte)tracker.mode;
@@ -82,12 +82,10 @@ internal struct SavedConstraint6 : ISavedConstraint<SavedConstraint6>
     public async Task Write(Stream stream)
     {
         stream.WriteByte(constraintMode);
-        await stream.WriteAsync(BitConverter.GetBytes(firstObjectIndex), 0, sizeof(uint));
-        await stream.WriteAsync(BitConverter.GetBytes(secondObjectIndex), 0, sizeof(uint));
-        stream.WriteByte((byte)childIndicesToFirst.Length);
-        stream.WriteByte((byte)childIndicesToSecond.Length);
-        await stream.WriteAsync(childIndicesToFirst, 0, childIndicesToFirst.Length);
-        await stream.WriteAsync(childIndicesToSecond, 0, childIndicesToSecond.Length);
+        await stream.WriteAsync(BitConverter.GetBytes(firstObjectIndex), 0, sizeof(int));
+        await stream.WriteAsync(BitConverter.GetBytes(secondObjectIndex), 0, sizeof(int));
+        await SaveUtils.WriteArrayAsync(stream, childIndicesToFirst, 1);
+        await SaveUtils.WriteArrayAsync(stream, childIndicesToSecond, 1);
     }
 
     public void Initialize(AssetPoolee[] initializedPoolees, Constrainer constrainer)

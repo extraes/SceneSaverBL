@@ -29,7 +29,9 @@ internal static class SaveUtils
     private static Constrainer constrainer;
     static readonly byte[] FormatId = { (byte)'S', (byte)'S', (byte)'B', (byte)'L' };
 
-    public static void CleanTrackers<T>(ref T[] constraints) where T : struct, ISavedConstraint<T>
+    public static void CleanTrackers<T, TSF>(ref T[] constraints) 
+        where T : struct, ISavedConstraint<T, TSF> 
+        where TSF : ISaveFile
     {
         T[] oldConstraints = constraints;
         int usedTrackers = constraints.Count(sc => !sc.Equals(default));
