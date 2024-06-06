@@ -21,6 +21,17 @@ public static class SaveStore
         string cfgTxt = File.ReadAllText(IP_ADDRS_FILE);
 
         ownerHashToIpAddrs = TomletMain.To<Dictionary<string, string>>(cfgTxt);
+
+        CreateDirectoryRecursive(SAVE_PATH);
+    }
+
+    public static void CreateDirectoryRecursive(string directory)
+    {
+        string parentDir = Path.GetDirectoryName(directory)!;
+
+        if (!Directory.Exists(parentDir)) CreateDirectoryRecursive(parentDir);
+
+        Directory.CreateDirectory(directory);
     }
 
     internal static async Task CleanupExpiredFiles()
