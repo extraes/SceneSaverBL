@@ -26,6 +26,7 @@ public class RepoConfig
     }
 
     public string repoName = "SSBL Repo";
+    public string url = "";
     public int statUpdatePeriodMinutes = 15;
     public int maxFilesizeKB = 512;
     public int maxPopularSaves = 100;

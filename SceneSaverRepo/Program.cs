@@ -39,7 +39,7 @@ namespace SceneSaverRepo
 
             app.MapControllers();
             
-            app.Run("http://localhost:9002");
+            app.Run(RepoConfig.instance.url);
         }
     }
 }
