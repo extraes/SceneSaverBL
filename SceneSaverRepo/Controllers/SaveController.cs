@@ -1,11 +1,6 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
+﻿using Microsoft.AspNetCore.Mvc;
 using SceneSaverRepo.Data;
-using System.Diagnostics.Eventing.Reader;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
-using Tomlet;
 
 namespace SceneSaverRepo.Controllers;
 
@@ -69,9 +64,23 @@ public class SaveController : ControllerBase
         saveMetadata.version = fileBytes[0];
         saveMetadata.name = filename;
         saveMetadata.hash = Convert.ToHexString(hashed).ToUpper();
-        saveMetadata.tag = await SaveStore.GetTag(saveMetadata.hash);
+        saveMetadata.tag = await SaveStore.GetOrCreateTag(saveMetadata.hash);
         saveMetadata.expire = temporary ? DateTime.Now + TimeSpan.FromHours(12) : DateTime.MaxValue;
         saveMetadata.owner = hashedOwner;
+
+        if (System.IO.File.Exists(saveMetadata.GetMetafilePath()))
+        {
+            // skinwalk existing metadata to avoid overwriting download counts & a potentially already-extended expiration
+            saveMetadata = await SaveStore.ReadMetadata(saveMetadata.tag);
+            if (saveMetadata.expire is not null && saveMetadata.TimeUntilExpired() < TimeSpan.FromHours(12))
+            {
+                saveMetadata.expire = DateTime.Now + TimeSpan.FromHours(12);
+            }
+
+            await SaveStore.WriteMetadata(saveMetadata);
+
+            return Ok(saveMetadata);
+        }
 
         await SaveStore.WriteMetadata(saveMetadata);
         await SaveStore.WriteSave(saveMetadata, fileBytes);

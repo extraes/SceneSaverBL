@@ -1,5 +1,4 @@
 ﻿using SceneSaverRepo.Data;
-using System.IO;
 using Tomlet;
 
 namespace SceneSaverRepo;
@@ -96,7 +95,7 @@ public static class SaveStore
     }
 
     // this WILL blow up! test thoroughly!
-    public static async Task<string> GetTag(string incomingHash)
+    public static async Task<string> GetOrCreateTag(string incomingHash)
     {
         string tag = incomingHash.Substring(0, 4);
         string dir = Path.Combine(SAVE_PATH, tag);
@@ -123,7 +122,6 @@ public static class SaveStore
             tag = incomingHash.Substring(0, tag.Length + 1);
             dir = Path.Combine(SAVE_PATH, tag);
 
-
             if (!Directory.Exists(dir))
             {
                 Directory.CreateDirectory(dir);
@@ -141,6 +139,7 @@ public static class SaveStore
     {
         string tomletStr = TomletMain.TomlStringFrom(entry);
         string path = Path.Combine(GetDirFor(entry), SceneSaverSaveEntry.FILENAME);
+
         await File.WriteAllTextAsync(path, tomletStr); // write metadata either way to update expiry date/time
     }
 

@@ -1,6 +1,4 @@
-﻿using System;
-using System.Text.Encodings;
-using System.Text;
+﻿using System.Text;
 using System.Security.Cryptography;
 using Tomlet;
 

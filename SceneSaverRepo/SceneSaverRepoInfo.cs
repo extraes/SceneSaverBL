@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace SceneSaverRepo.Data;
+﻿namespace SceneSaverRepo.Data;
 
 #if NET7_0_OR_GREATER
 [System.Text.Json.Serialization.JsonSerializable(typeof(SceneSaverRepoInfo))]
@@ -8,7 +6,7 @@ namespace SceneSaverRepo.Data;
 public partial class SceneSaverRepoInfo
 {
 #if NET7_0_OR_GREATER
-    static readonly Version _version = new(1, 0, 0);
+    static readonly Version _version = new(1, 1, 0);
     static readonly TimeZoneInfo _timeZone = TimeZoneInfo.Local;
 
     public SceneSaverRepoInfo()

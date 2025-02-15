@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace SceneSaverRepo.Data;
 
@@ -23,6 +21,11 @@ public class SceneSaverSaveEntry
     {
         string fileStr = await File.ReadAllTextAsync(path);
         return Tomlet.TomletMain.To<SceneSaverSaveEntry>(fileStr);
+    }
+
+    public string GetMetafilePath()
+    {
+        return Path.Combine(SaveStore.SAVE_PATH, tag, FILENAME);
     }
 #endif
 

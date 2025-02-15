@@ -72,6 +72,12 @@ public static class RepoInfoAccumulator
 
     public static void NewSaveCreated(SceneSaverSaveEntry entry)
     {
+        if (recentSaves.Contains(entry))
+        {
+            // dont let reuploads bruteforce onto recents
+            return;
+        }
+
         recentSaves.Enqueue(entry);
         if (recentSaves.Count > RepoConfig.instance.maxRecentSaves)
             recentSaves.Dequeue();
