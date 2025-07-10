@@ -1,43 +1,20 @@
-﻿using Jevil;
-using Jevil.Spawning;
-using SceneSaverBL.Interfaces;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using SceneSaverBL.Interfaces;
 
 namespace SceneSaverBL.Versions.Version6;
 
 internal struct SavedTransform6 : IContextfulSavedObject<SavedTransform6, Transform, TransformInitializationContext6>
 {
-    // 12 + 12 + 8 = 32
+    // 12 + 12 + 12 + 8 = 44 -> packed to 64 bytes
     private Vector3 localPos;
     private Vector3 scale;
     private Vector3 localRotation;
+    private SavedHierarchyLocation6 hierarchyLoc;
 
-    public Vector3 LocalPosition => localPos;
-    public Quaternion Rotation => Quaternion.Euler(localRotation);
+    public readonly Vector3 LocalPosition => localPos;
+    public readonly Quaternion Rotation => Quaternion.Euler(localRotation);
 
     static byte[] vector3Buffer = new byte[Const.SizeV3];
-
-
-    public void Construct(Transform sourceTransform)
-    {
-        localPos = sourceTransform.transform.localPosition;
-        scale = sourceTransform.transform.localScale;
-        localRotation = sourceTransform.transform.localRotation.eulerAngles;
-
-#if DEBUG
-        SaveChecks.ThrowIfInvalid(localPos);
-        SaveChecks.ThrowIfInvalid(localRotation);
-        SaveChecks.ThrowIfInvalid(scale);
-#endif
-    }
+    static List<int> sharedIntList = new(10); // use one list so i can just toarray for each transform so im not overallocating locally
 
     // cannot be async - async methods cannot modify their original instances
     public void Read(Stream stream)
@@ -45,21 +22,22 @@ internal struct SavedTransform6 : IContextfulSavedObject<SavedTransform6, Transf
         Vector3 readPos;
         Vector3 readScale;
         Vector3 readRot;
-        //ushort readChildren;
         byte[] buffer = vector3Buffer;
 
         stream.Read(buffer, 0, Const.SizeV3);
         readPos = Utilities.DebyteV3(buffer, 0);
+
         stream.Read(buffer, 0, Const.SizeV3);
         readScale = Utilities.DebyteV3(buffer, 0);
+
         stream.Read(buffer, 0, Const.SizeV3);
         readRot = Utilities.DebyteV3(buffer, 0);
-        //stream.Read(buffer, 0, sizeof(ushort));
-        //readChildren = BitConverter.ToUInt16(buffer, 0);
 
         localPos = readPos;
         localRotation = readRot;
         scale = readScale;
+
+        hierarchyLoc.Read(stream);
 
 #if DEBUG
         SceneSaverBL.Log($"Read: " + ToString());
@@ -71,40 +49,48 @@ internal struct SavedTransform6 : IContextfulSavedObject<SavedTransform6, Transf
 
     public async Task Write(Stream stream)
     {
-        byte[] posBytes = localPos.ToBytes();
-        byte[] scaleBytes = scale.ToBytes();
-        byte[] rotBytes = localRotation.ToBytes();
-        //byte[] childrenBytes = BitConverter.GetBytes(children);
-        await stream.WriteAsync(posBytes, 0, Const.SizeV3);
-        await stream.WriteAsync(scaleBytes, 0, Const.SizeV3);
-        await stream.WriteAsync(rotBytes, 0, Const.SizeV3);
-        //await stream.WriteAsync(childrenBytes, 0, Const.SizeV3); ;
+        byte[] buffer = vector3Buffer;
+
+        Utilities.SerializeInPlace(buffer, localPos);
+        await stream.WriteAsync(buffer, 0, Const.SizeV3);
+        
+        Utilities.SerializeInPlace(buffer, scale);
+        await stream.WriteAsync(buffer, 0, Const.SizeV3);
+        
+        Utilities.SerializeInPlace(buffer, localRotation);
+        await stream.WriteAsync(buffer, 0, Const.SizeV3);
+
+        await hierarchyLoc.Write(stream);
 
 #if DEBUG
         SceneSaverBL.Log("Wrote " + ToString());
 #endif
     }
 
-    public Task<Transform> Initialize() => throw new NotSupportedException("SavedTransform is a contextually saved object - you must initialize it with a context");
-
-    public Task<Transform> Initialize(TransformInitializationContext6 context)
+    public async Task<Transform> Initialize(TransformInitializationContext6 context)
     {
-        Transform t = context.transform;
+        HierarchyInitializationContext6 hic = new(context.poolees);
+
+        Transform targetTransform = await hierarchyLoc.Initialize(hic);
 
         // use localposition because it will likely have lower average values, meaning (insignificantly) more precise floats
-        t.localPosition = LocalPosition;
-        t.localRotation = Rotation;
-        t.localScale = scale;
+        if (targetTransform.root == targetTransform)
+            targetTransform.localPosition = LocalPosition + context.worldspaceRootOffset;
+        else
+            targetTransform.localPosition = LocalPosition;
+        targetTransform.localRotation = Rotation;
+        targetTransform.localScale = scale;
 
 #if DEBUG
-        SceneSaverBL.Log($"Transform '{t.name}' LocalPosition set to: {t.localPosition} (Deserialized pos was {SaveUtils.ToStr(localPos)})");
-        float dist = Vector3.Distance(localPos, t.localPosition);
-        if (dist > 0.1f) SceneSaverBL.Warn($"!!! THIS IS {dist} METERS AWAY FROM SERIALIZED POSITION!!! SPOS: {SaveUtils.ToStr(localPos)}");
-        SaveChecks.ThrowIfInvalid(t.localPosition);
-        SaveChecks.ThrowIfInvalid(t.position);
+        SceneSaverBL.Log($"Transform '{targetTransform.name}' LocalPosition set to: {targetTransform.localPosition} (Deserialized pos was {SaveUtils.ToStr(localPos)})");
+        float dist = Vector3.Distance(localPos, targetTransform.localPosition);
+        if (targetTransform.root != targetTransform && context.worldspaceRootOffset != default && dist > 0.1f)
+            SceneSaverBL.Warn($"!!! THIS IS {dist} METERS AWAY FROM SERIALIZED POSITION!!! SPOS: {SaveUtils.ToStr(localPos)}");
+        SaveChecks.ThrowIfInvalid(targetTransform.localPosition);
+        SaveChecks.ThrowIfInvalid(targetTransform.position);
 #endif
 
-        return Task.FromResult(t);
+        return targetTransform;
     }
 
     public bool Equals(SavedTransform6 other)
@@ -115,8 +101,25 @@ internal struct SavedTransform6 : IContextfulSavedObject<SavedTransform6, Transf
             && other.scale == this.scale;
     }
 
-    public override string ToString()
+    public override readonly string ToString()
     {
+        // use SaveUtils.ToStr to avoid having to use Il2CppThreadScope because the default ToString from IL2CPP allocates from the IL2CPP domain, which throws a shitfit on off-main threads.
         return $"SSBL Transform V6 - LPos = {SaveUtils.ToStr(localPos)}; LRot (euler) = {SaveUtils.ToStr(localRotation)}; Scale = {SaveUtils.ToStr(scale)}";
+    }
+
+    public void Construct(Transform sourceTransform, TransformInitializationContext6 ctx)
+    {
+        localPos = sourceTransform.transform.localPosition;
+        scale = sourceTransform.transform.localScale;
+        localRotation = sourceTransform.transform.localRotation.eulerAngles;
+
+        HierarchyInitializationContext6 hic = new(ctx.poolees);
+        hierarchyLoc.Construct(sourceTransform, hic);
+
+#if DEBUG
+        SaveChecks.ThrowIfInvalid(localPos);
+        SaveChecks.ThrowIfInvalid(localRotation);
+        SaveChecks.ThrowIfInvalid(scale);
+#endif
     }
 }

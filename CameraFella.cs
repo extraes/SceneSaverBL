@@ -1,12 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
-using Jevil;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace SceneSaverBL;
 
@@ -38,7 +30,7 @@ internal static class CameraFella
 
     public static void UpdatePosition()
     {
-        if (!SelectionZone.Active || cameraFella.INOC()) return;
+        if (!SelectionZone.Active || cameraFella == null) return;
 
         (Vector3 pos, Vector3 dir) = SelectionZone.Instance.GetCameraPosAndDir();
         cameraFella.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(-dir)); // negate because quads default to facing backwards i guess
@@ -46,11 +38,12 @@ internal static class CameraFella
 
     static async Task SavingStartedImpl(CancellationToken token)
     {
-        if (cameraFella.INOC()) await MenuOpenedImpl(token);
+        if (cameraFella == null) await MenuOpenedImpl(token);
 
         cameraFella.GetComponent<Animation>().Play();
     }
 
+    [MemberNotNull(nameof(cameraFella))]
     static async Task MenuOpenedImpl(CancellationToken token)
     {
         GameObject go = await Assets.Prefabs.SavingPhotographer.GetAsync();

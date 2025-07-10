@@ -1,15 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
-using SLZ.Marrow.Pool;
-using SLZ.Props;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnhollowerBaseLib;
-using UnityEngine;
-
-namespace SceneSaverBL.Versions.Version5;
+﻿namespace SceneSaverBL.Versions.Version5;
 
 internal struct SaveContext5
 {
@@ -17,7 +6,7 @@ internal struct SaveContext5
     internal ConstraintTracker[] allTrackers;
 
     // used for both serialization and deserialization
-    internal AssetPoolee[] poolees;
+    internal Poolee[] poolees;
     internal List<Transform>[] transformsByPoolee;
     internal byte[] barcodeBytes;
     internal byte[] usernameBytes;

@@ -1,24 +1,7 @@
-﻿using BoneLib.BoneMenu;
-using BoneLib.BoneMenu.Elements;
-using Cysharp.Threading.Tasks;
-using Jevil;
+﻿using Il2CppSLZ.Marrow.SceneStreaming;
 using Jevil.Tweening;
-using PuppetMasta;
 using SceneSaverBL.Interfaces;
-using SLZ.AI;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Props;
-using SLZ.VRMK;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SceneSaverBL.Versions.Version5;
 
@@ -39,11 +22,11 @@ public class SaveFile5 : ISaveFile
     SavedConstraint5[] constraints;
     SavedPoolee5[] poolees;
     SavedTransform5[][] transforms;
-    Action executePostInit;
+    Action? executePostInit;
 
     public byte Version => 5;
 
-    public async Task Construct(AssetPoolee[] savingPoolees, ConstraintTracker[] allConstraints)
+    public async Task Construct(Poolee[] savingPoolees, ConstraintTracker[] allConstraints)
     {
 #if DEBUG
         using var ps = new ProfilingScope(SceneSaverBL.instance.LoggerInstance, ProfilingScope.ProfilingType.ALL, "V5 Construct");
@@ -103,7 +86,7 @@ public class SaveFile5 : ISaveFile
 
         if (header.hasSerializedTransforms)
         {
-            if (Prefs.fullsaveOverTime)
+            if (ConfigVars.fullsaveOverTime)
             {
                 for (int i = 0; i < savingTransforms.Length; i++)
                 {
@@ -201,7 +184,7 @@ public class SaveFile5 : ISaveFile
         ctx.constrainer = await SaveUtils.GetDummyConstrainer();
         SceneSaverBL.Log("Retrieved dummy constrainer " + ctx.constrainer.name);
 
-        await AsyncUtilities.ForTimeSlice(0, header.poolees, InitializePoolee, Prefs.timeSliceMs);
+        await AsyncUtilities.ForTimeSlice(0, header.poolees, InitializePoolee, ConfigVars.timeSliceMs);
 
         // wait for the game to initialize all poolees
         // dont use UniTask.WhenAll because im a lazy fucker who doesnt want to deal with seeing which IL2CPP array i need to use for it to work properly
@@ -222,14 +205,14 @@ public class SaveFile5 : ISaveFile
 
         //todo: make constraints initialize immediately after their poolee inits (array is sorted by DependentOn, see SaveUtils.CleanTrackers)
 
-        await AsyncUtilities.ForTimeSlice(0, header.constraints, InitializeConstraint, Prefs.timeSliceMs);
+        await AsyncUtilities.ForTimeSlice(0, header.constraints, InitializeConstraint, ConfigVars.timeSliceMs);
 
         if (Prefs.freezeWhileLoading)
         {
 #if DEBUG
             using var ps = new ProfilingScope(SceneSaverBL.instance.LoggerInstance, ProfilingScope.ProfilingType.ALL, "V5 Unfreeze post-init");
 #endif
-            await AsyncUtilities.ForEachTimeSlice(ctx.frozenDuringLoad, kvp => InitializeFinishedUnfreeze(kvp.Key, kvp.Value), Prefs.timeSliceMs);
+            await AsyncUtilities.ForEachTimeSlice(ctx.frozenDuringLoad, kvp => InitializeFinishedUnfreeze(kvp.Key, kvp.Value), ConfigVars.timeSliceMs);
         }
     }
 
@@ -252,7 +235,7 @@ public class SaveFile5 : ISaveFile
         this.filePath = filePath;
     }
 
-    public void PopulateBoneMenu(MenuCategory category)
+    public void PopulateBoneMenu(Page category)
     {
 #if DEBUG
         SaveChecks.ThrowIfOffMainThread();
@@ -265,26 +248,26 @@ public class SaveFile5 : ISaveFile
         if (barcodeMismatch && Prefs.filterByLevel) return;
 
         string name = Path.GetFileNameWithoutExtension(filePath);
-        MenuCategory headerCategory = category.CreateCategory($"Internal details: {name}", Color.white);
-        category.Elements.Remove(headerCategory);
+        Page headerCategory = new($"Internal details: {name}", Color.white);
+        headerCategory.Parent = category;
 
-        SubPanelElement spe = category.CreateSubPanel(name, barcodeMismatch ? Color.yellow : Color.white);
-        spe.CreateFunctionElement($"{header.poolees} obj(s)", Color.gray, SaveUtils.NothingAction);
-        spe.CreateFunctionElement(header.hasSerializedTransforms ? "Full save" : "Quick save", Color.gray, SaveUtils.NothingAction);
-        spe.CreateFunctionElement("Preview", Color.white, Preview);
-        spe.CreateFunctionElement("Load", Color.white, Load);
+        Page myPage = category.CreatePage(name, barcodeMismatch ? Color.yellow : Color.white);
+        myPage.CreateFunction($"{header.poolees} obj(s)", Color.gray, SaveUtils.NothingAction);
+        myPage.CreateFunction(header.hasSerializedTransforms ? "Full save" : "Quick save", Color.gray, SaveUtils.NothingAction);
+        myPage.CreateFunction("Preview", Color.white, Preview);
+        myPage.CreateFunction("Load", Color.white, Load);
         if (header.hasSerializedTransforms)
-            spe.CreateFunctionElement("Load as Quicksave", Color.white, LoadAsQuicksave);
-        spe.CreateFunctionElement("Delete", Color.red, () => File.Delete(filePath));
-        spe.CreateFunctionElement("View all information", Color.gray, () => MenuManager.SelectCategory(headerCategory));
+            myPage.CreateFunction("Load as Quicksave", Color.white, LoadAsQuicksave);
+        myPage.CreateFunction("Delete", Color.red, () => File.Delete(filePath));
+        myPage.CreateFunction("View all information", Color.gray, () => Menu.OpenPage(headerCategory));
 
-        // this effectively places mismatching files at the end of the list
-        // and if EnumerateFiles orders by date then this should place recent files at the top
-        if (!barcodeMismatch)
-        {
-            category.Elements.Remove(spe);
-            category.Elements.Insert(0, spe);
-        }
+        //// this effectively places mismatching files at the end of the list
+        //// and if EnumerateFiles orders by date then this should place recent files at the top
+        //if (!barcodeMismatch)
+        //{
+        //    category.Elements.Remove(spe);
+        //    category.Elements.Insert(0, spe);
+        //}
 
         PopulateHeaderCategory(headerCategory);
     }
@@ -300,9 +283,28 @@ public class SaveFile5 : ISaveFile
         return File.Exists(filePath);
     }
 
+    public (Bounds display, Bounds elementBounds) GetBoundsForDupeAndDisplay()
+    {
+        Vector3 center = header.centerBottom;
+        center.y += header.size.y / 2;
+        Bounds displayBounds = new(center, header.size);
+
+        if (poolees.Length == 0)
+            return (displayBounds, displayBounds);
+        Bounds bounds = new(poolees[0].Position, Vector3.zero);
+        Vector3 up2 = Vector3.up * 2;
+        foreach (SavedPoolee5 obj in poolees)
+        {
+            bounds.Encapsulate(obj.Position);
+            bounds.Encapsulate(obj.Position + up2); // add an extra meter for... idk bipeds or some shit
+        }
+
+        return (displayBounds, bounds);
+    }
+
     #region Construction
 
-    static async Task<List<Transform>[]> GetTransformsToBeSaved(AssetPoolee[] poolees)
+    static async Task<List<Transform>[]> GetTransformsToBeSaved(Poolee[] poolees)
     {
         List<Transform>[] result = new List<Transform>[poolees.Length];
         // i got bored with saving state to an object. im just gonna have the compiler do it for me by allocating even more garbage in the form of lambda closures (JOY!)
@@ -312,21 +314,21 @@ public class SaveFile5 : ISaveFile
         return result;
     }
 
-    static async Task GetTransformsToBeSavedImpl(AssetPoolee[] poolees, List<Transform>[] resultList, int idx)
+    static async Task GetTransformsToBeSavedImpl(Poolee[] poolees, List<Transform>[] resultList, int idx)
     {
-        AssetPoolee poolee = poolees[idx];
+        Poolee poolee = poolees[idx];
         List<Transform> section;
         bool dontWalkHierarchy = Prefs.saveChecks && !SaveChecks.IsHierarchyConsistent(poolee);
 
         if (dontWalkHierarchy)
         {
-            SceneSaverBL.Warn($"The hierarchy for the spawnable '{poolee.name}' from the crate {poolee.spawnableCrate.Barcode.ID} has an inconsistent hierarchy!!! (It changes its hierarchy after being spawned!)");
-            SceneSaverBL.Warn($"This means it will not be loaded properly in SSBL saves. If you want it to be saved, tell the mod creator ({poolee.spawnableCrate.Pallet.Author}) that it cannot be saved because of this!");
+            SceneSaverBL.Warn($"The hierarchy for the spawnable '{poolee.name}' from the crate {poolee.SpawnableCrate.Barcode.ID} has an inconsistent hierarchy!!! (It changes its hierarchy after being spawned!)");
+            SceneSaverBL.Warn($"This means it will not be loaded properly in SSBL saves. If you want it to be saved, tell the mod creator ({poolee.SpawnableCrate.Pallet.Author}) that it cannot be saved because of this!");
             section = new List<Transform> { poolee.transform };
         }
         else
         {
-            if (Prefs.fullsaveOverTime) 
+            if (ConfigVars.fullsaveOverTime) 
                 section = await SaveUtils.WalkHierarchyAsync(poolee.transform);
             else
                 section = SaveUtils.WalkHierarchy(poolee.transform);
@@ -337,8 +339,8 @@ public class SaveFile5 : ISaveFile
 
     void ConstructPoolee(int idx)
     {
-        AssetPoolee poolee = ctx.poolees[idx];
-        if (poolee.INOC()) return; // ignore collected objects
+        Poolee poolee = ctx.poolees[idx];
+        if (poolee == null) return; // ignore collected objects
 
         poolees[idx].Construct(poolee);
         // use blocking call/conversion because it should already be cached, and if its not, the spike should only happen once as its re-cached
@@ -348,7 +350,7 @@ public class SaveFile5 : ISaveFile
     void ConstructConstraint(int idx)
     {
         ConstraintTracker ctr = ctx.allTrackers[idx];
-        if (ctr.INOC()) return; // ignore collected objects
+        if (ctr == null) return; // ignore collected objects
 
         bool firstHasPoolee = SceneSaverBL.GetPooleeUpwards(ctr.attachPoint.transform);
         bool secondHasPoolee = SceneSaverBL.GetPooleeUpwards(ctr.otherTracker.attachPoint.transform);
@@ -358,7 +360,7 @@ public class SaveFile5 : ISaveFile
         if (!(firstHasPoolee || secondHasPoolee)) return;
 
         // cannot save object constrained to non-static object without weld
-        if (pooleeAttachedToStatic && ctr.mode != Constrainer.ConstraintMode.Weld) return;
+        if (pooleeAttachedToStatic && SpawnerStates.Constraint.GetModeWhenSpawned(ctr) != Constrainer.ConstraintMode.Weld) return;
 
         try
         {
@@ -408,7 +410,7 @@ public class SaveFile5 : ISaveFile
 #if DEBUG
         using var ps = new ProfilingScope(SceneSaverBL.instance.LoggerInstance, ProfilingScope.ProfilingType.ALL, "V5 Preview");
 #endif
-        if (previewTexture.INOC()) LoadPreview();
+        if (previewTexture == null) LoadPreview();
 
         GameObject polaroidPrefab = await Assets.Prefabs.Polaroid.GetAsync();
         GameObject boundsLinesPrefab = await Assets.Prefabs.FullsavePreviewBounds.GetAsync();
@@ -487,7 +489,7 @@ public class SaveFile5 : ISaveFile
 #if DEBUG
         Utilities.InspectInUnityExplorer(this);
 #endif
-        Exception ex = await AsyncUtilities.WrapNoThrow(Read, fs);
+        Exception? ex = await AsyncUtilities.WrapNoThrow(Read, fs);
         if (ex != null)
         {
             // we dont want to init if loading failed
@@ -502,23 +504,23 @@ public class SaveFile5 : ISaveFile
         SceneSaverBL.needInitialize.Enqueue(this);
     }
 
-    void PopulateHeaderCategory(MenuCategory category)
+    void PopulateHeaderCategory(Page category)
     {
-        SubPanelElement countSpe = category.CreateSubPanel("Counts", Color.white);
-        countSpe.CreateFunctionElement($"{header.poolees} poolee(s)", Color.gray, SaveUtils.NothingAction);
-        countSpe.CreateFunctionElement($"{header.constraints} constraint(s)", Color.gray, SaveUtils.NothingAction);
-        countSpe.CreateFunctionElement(header.hasSerializedTransforms ? "Saved child transform(s) (fullsave)" : "No saved child transforms (quicksave)", Color.gray, SaveUtils.NothingAction);
-        countSpe.CreateFunctionElement($"{header.serializedTransformCounts.Sum(ush => ush)} child transform(s)", Color.gray, SaveUtils.NothingAction);
+        Page countPage = category.CreatePage("Counts", Color.white);
+        countPage.CreateFunction($"{header.poolees} poolee(s)", Color.gray, SaveUtils.NothingAction);
+        countPage.CreateFunction($"{header.constraints} constraint(s)", Color.gray, SaveUtils.NothingAction);
+        countPage.CreateFunction(header.hasSerializedTransforms ? "Saved child transform(s) (fullsave)" : "No saved child transforms (quicksave)", Color.gray, SaveUtils.NothingAction);
+        countPage.CreateFunction($"{header.serializedTransformCounts.Sum(ush => ush)} child transform(s)", Color.gray, SaveUtils.NothingAction);
 
-        SubPanelElement dataSpe = category.CreateSubPanel("Data", Color.white);
-        dataSpe.CreateFunctionElement($"Header size: {header.dataStartStreamPos - 1}B", Color.gray, SaveUtils.NothingAction);
-        dataSpe.CreateFunctionElement($"Preview size: {Math.Round(header.previewLen / 1024.0, 2)}KB", Color.gray, SaveUtils.NothingAction);
-        dataSpe.CreateFunctionElement($"Barcode size: {header.barcodeLen} bytes", Color.gray, SaveUtils.NothingAction);
-        dataSpe.CreateFunctionElement($"Barcode: {Encoding.UTF8.GetString(ctx.barcodeBytes)}", Color.gray, SaveUtils.NothingAction);
-        dataSpe.CreateFunctionElement($"Author name size: {header.usernameLen} bytes", Color.gray, SaveUtils.NothingAction);
-        dataSpe.CreateFunctionElement($"Author: {Encoding.UTF8.GetString(ctx.usernameBytes)}", Color.white, SaveUtils.NothingAction);
-        dataSpe.CreateFunctionElement($"Center bottom (meters): {header.centerBottom}", Color.gray, SaveUtils.NothingAction);
-        dataSpe.CreateFunctionElement($"Size (meters): {header.size}", Color.gray, SaveUtils.NothingAction);
+        Page dataPage = category.CreatePage("Data", Color.white);
+        dataPage.CreateFunction($"Header size: {header.dataStartStreamPos - 1}B", Color.gray, SaveUtils.NothingAction);
+        dataPage.CreateFunction($"Preview size: {Math.Round(header.previewLen / 1024.0, 2)}KB", Color.gray, SaveUtils.NothingAction);
+        dataPage.CreateFunction($"Barcode size: {header.barcodeLen} bytes", Color.gray, SaveUtils.NothingAction);
+        dataPage.CreateFunction($"Barcode: {Encoding.UTF8.GetString(ctx.barcodeBytes)}", Color.gray, SaveUtils.NothingAction);
+        dataPage.CreateFunction($"Author name size: {header.usernameLen} bytes", Color.gray, SaveUtils.NothingAction);
+        dataPage.CreateFunction($"Author: {Encoding.UTF8.GetString(ctx.usernameBytes)}", Color.white, SaveUtils.NothingAction);
+        dataPage.CreateFunction($"Center bottom (meters): {header.centerBottom}", Color.gray, SaveUtils.NothingAction);
+        dataPage.CreateFunction($"Size (meters): {header.size}", Color.gray, SaveUtils.NothingAction);
     }
 
     #endregion
@@ -537,8 +539,8 @@ public class SaveFile5 : ISaveFile
         }
         else transforms = Array.Empty<SavedTransform5[]>();
 
-        ctx.poolees = new AssetPoolee[header.poolees];
-        ctx.pooleeTasks = new Task<AssetPoolee>[header.poolees];
+        ctx.poolees = new Poolee[header.poolees];
+        ctx.pooleeTasks = new Task<Poolee>[header.poolees];
         ctx.allTrackers = new ConstraintTracker[header.constraints];
         ctx.frozenDuringLoad = new(header.poolees, UnityObjectComparer<Rigidbody>.Instance);
     }
@@ -582,7 +584,7 @@ public class SaveFile5 : ISaveFile
 #endif
         try
         {
-            Task<AssetPoolee> task = poolees[idx].Initialize();
+            Task<Poolee> task = poolees[idx].Initialize();
             ctx.pooleeTasks[idx] = task;
             ctx.poolees[idx] = await task;
 
@@ -660,7 +662,7 @@ public class SaveFile5 : ISaveFile
 
         ctx.transformsByPoolee = new List<Transform>[header.poolees];
 
-        if (Prefs.fullsaveOverTime)
+        if (ConfigVars.fullsaveOverTime)
         {
             for (int i = 0; i < header.poolees; i++)
             {
@@ -682,7 +684,7 @@ public class SaveFile5 : ISaveFile
     {
         await TraverseHierarchies();
 
-        if (Prefs.fullsaveOverTime)
+        if (ConfigVars.fullsaveOverTime)
         {
 #if DEBUG
             using var ps1 = new ProfilingScope(SceneSaverBL.instance.LoggerInstance, ProfilingScope.ProfilingType.ALL, "V5 Transform Init - ALL");
@@ -699,10 +701,10 @@ public class SaveFile5 : ISaveFile
 #endif
                 if (subtransformCountRuntime != subtransformCountFile) continue;
 
-                await AsyncUtilities.ForTimeSlice(0, subtransformCountFile, j => InitializeTransformSingle(i, j), Prefs.timeSliceMs);
+                await AsyncUtilities.ForTimeSlice(0, subtransformCountFile, j => InitializeTransformSingle(i, j), ConfigVars.timeSliceMs);
             }
         }
-        else await AsyncUtilities.ForTimeSlice(0, header.poolees, InitializeTransformsMultiple, Prefs.timeSliceMs);
+        else await AsyncUtilities.ForTimeSlice(0, header.poolees, InitializeTransformsMultiple, ConfigVars.timeSliceMs);
     }
 
     void InitializeFinishedUnfreeze(Rigidbody rb, bool preFreeze)

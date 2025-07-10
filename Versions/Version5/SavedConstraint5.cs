@@ -1,18 +1,4 @@
-﻿using System.IO;
-using Jevil;
-using SLZ.Marrow.Pool;
-using SLZ.Props;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-using SLZ.SaveData;
-using Cysharp.Threading.Tasks;
-using System.Runtime.InteropServices;
-using SceneSaverBL.Interfaces;
-using SLZ.Bonelab;
+﻿using SceneSaverBL.Interfaces;
 
 namespace SceneSaverBL.Versions.Version5;
 
@@ -51,10 +37,10 @@ internal struct SavedConstraint5 : ISavedConstraint<SavedConstraint5>
         stream.Read(childIndicesToSecond, 0, childIndicesToSecond.Length);
     }
 
-    public void Construct(AssetPoolee[] poolees, ConstraintTracker tracker)
+    public void Construct(Poolee[] poolees, ConstraintTracker tracker)
     {
         //conAnchor = tracker.joint.connectedAnchor;
-        constraintMode = (byte)tracker.mode;
+        constraintMode = (byte)SpawnerStates.Constraint.GetModeWhenSpawned(tracker);
 
         int? idx1 = GetPooleeIdx(poolees, tracker.attachPoint);
         int? idx2 = GetPooleeIdx(poolees, tracker.otherTracker.attachPoint);
@@ -62,7 +48,7 @@ internal struct SavedConstraint5 : ISavedConstraint<SavedConstraint5>
 #if DEBUG
         SceneSaverBL.Log($"Saving constraint for poolees with indices {idx1?.ToString() ?? "NULL"} & {idx2?.ToString() ?? "NULL"}");
 #endif
-        if (tracker.mode != Constrainer.ConstraintMode.Weld && (!idx1.HasValue || !idx2.HasValue))
+        if (SpawnerStates.Constraint.GetModeWhenSpawned(tracker) != Constrainer.ConstraintMode.Weld && (!idx1.HasValue || !idx2.HasValue))
         {
             throw new ArgumentException($"Transform(s) PATH1={tracker.attachPoint.GetFullPath()} PATH2={tracker.otherTracker.attachPoint.GetFullPath()} are not contained in the given list of poolees.");
         }
@@ -90,10 +76,10 @@ internal struct SavedConstraint5 : ISavedConstraint<SavedConstraint5>
         await stream.WriteAsync(childIndicesToSecond, 0, childIndicesToSecond.Length);
     }
 
-    public void Initialize(AssetPoolee[] initializedPoolees, Constrainer constrainer)
+    public void Initialize(Poolee[] initializedPoolees, Constrainer constrainer)
     {
-        AssetPoolee firstPoolee = firstObjectIndex != int.MaxValue ? initializedPoolees[firstObjectIndex] : null;
-        AssetPoolee secondPoolee = secondObjectIndex != int.MaxValue ? initializedPoolees[secondObjectIndex] : null;
+        Poolee firstPoolee = firstObjectIndex != int.MaxValue ? initializedPoolees[firstObjectIndex] : null;
+        Poolee secondPoolee = secondObjectIndex != int.MaxValue ? initializedPoolees[secondObjectIndex] : null;
 
         Transform tForm1 = firstPoolee == null ? CreateDummyTransform() : TraverseHierarchy(firstPoolee.transform, childIndicesToFirst);
         Transform tForm2 = secondPoolee == null ? CreateDummyTransform() : TraverseHierarchy(secondPoolee.transform, childIndicesToSecond);
@@ -115,7 +101,7 @@ internal struct SavedConstraint5 : ISavedConstraint<SavedConstraint5>
         Vector3 hostPt;
         Rigidbody hostBody = Instances<Rigidbody>.Get(host);
         Rigidbody otherBody = Instances<Rigidbody>.Get(otherT);
-        if (hostBody.INOC())
+        if (hostBody == null)
         {
             // should ensire hostBody is never null
             Rigidbody rb = hostBody;
@@ -130,8 +116,8 @@ internal struct SavedConstraint5 : ISavedConstraint<SavedConstraint5>
         constrainer.mode = constraintMode;
         constrainer._gO1 = host.gameObject;
         constrainer._gO2 = otherT.gameObject;
-        constrainer._rb1 = hostBody; // CANNOT be null else will just bailout
-        constrainer._rb2 = otherBody;
+        constrainer._mb1._rigidbody = hostBody; // CANNOT be null else will just bailout
+        constrainer._mb2._rigidbody = otherBody;
         constrainer._point1 = hostBody?.centerOfMass ?? hostPt + new Vector3(0, -100, 0);
         constrainer._point2 = otherBody?.centerOfMass ?? hostPt + new Vector3(0, -100, 0);
         
@@ -191,7 +177,7 @@ internal struct SavedConstraint5 : ISavedConstraint<SavedConstraint5>
         return ret;
     }
 
-    static int? GetPooleeIdx(AssetPoolee[] poolees, Transform t)
+    static int? GetPooleeIdx(Poolee[] poolees, Transform t)
     {
         string originalPath = t.GetFullPath();
         while (t.parent != null) t = t.parent;

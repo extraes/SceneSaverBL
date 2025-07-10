@@ -1,16 +1,6 @@
-﻿using Jevil;
-using PuppetMasta;
-using SLZ.AI;
-using SLZ.Marrow.Pool;
-using SLZ.VFX;
-using System;
-using System.Collections.Generic;
+﻿using Il2CppSLZ.Marrow.PuppetMasta;
+using Il2CppSLZ.VFX;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-using static RootMotion.FinalIK.AimPoser;
 
 namespace SceneSaverBL;
 
@@ -20,7 +10,7 @@ internal readonly struct SelectionChangeData
     public readonly int colliderInstanceId;
     public readonly bool removed;
 
-    public bool StillExists => !collider.INOC();
+    public bool StillExists => collider != null;
 
     public SelectionChangeData(Collider col, bool exited)
     {
@@ -42,7 +32,7 @@ internal static class SelectionParticles
 
     internal static void WireDisabled()
     {
-        pooleeRenderers.ForEach(kvp => { if (!kvp.Value[0].INOC()) GameObject.Destroy(kvp.Value[0].transform.parent.parent.gameObject); } ); // destroys root prefab im p sure
+        pooleeRenderers.ForEach(kvp => { if (kvp.Value[0] != null) GameObject.Destroy(kvp.Value[0].transform.parent.parent.gameObject); } ); // destroys targetTransform prefab im p sure
         pooleeRenderers.Clear();
     }
     internal static void WireEnabled() { }
@@ -66,20 +56,20 @@ internal static class SelectionParticles
             if (!data.StillExists) return;
 
             Collider col = data.collider;
-            AssetPoolee assetPoolee = SceneSaverBL.GetPooleeUpwards(col.transform);
+            Poolee? Poolee = SceneSaverBL.GetPooleeUpwards(col.transform);
 
             // modded maps do this weird shit
-            if (assetPoolee == null || assetPoolee.spawnableCrate.Barcode.ID == "SLZ.BONELAB.Core.DefaultPlayerRig") return;
+            if (Poolee == null || Poolee.SpawnableCrate.Barcode.ID == "SLZ.BONELAB.Core.DefaultPlayerRig") return;
 
             if (data.removed)
             {
                 SelectionZone.Instance.pooleesInSelectionZone.Remove(data.colliderInstanceId);
-                ParticleCheck(assetPoolee, !SelectionZone.Instance.pooleesInSelectionZone.Any(kvp => kvp.Value == assetPoolee));
+                ParticleCheck(Poolee, !SelectionZone.Instance.pooleesInSelectionZone.Any(kvp => kvp.Value == Poolee));
             }
             else
             {
-                SelectionZone.Instance.pooleesInSelectionZone[data.colliderInstanceId] = assetPoolee;
-                ParticleCheck(assetPoolee, false);
+                SelectionZone.Instance.pooleesInSelectionZone[data.colliderInstanceId] = Poolee;
+                ParticleCheck(Poolee, false);
             }
         }
 
@@ -89,11 +79,11 @@ internal static class SelectionParticles
 #endif
     }
 
-    static void ParticleCheck(AssetPoolee poolee, bool removed)
+    static void ParticleCheck(Poolee poolee, bool removed)
     {
         int pId = poolee.GetInstanceID();
 
-        if (removed && pooleeRenderers.TryGetValue(pId, out Renderer[] renderers))
+        if (removed && pooleeRenderers.TryGetValue(pId, out Renderer[]? renderers))
         {
             pooleeRenderers.Remove(pId);
             // pooling this would be better but i cannot be fucked
@@ -104,11 +94,11 @@ internal static class SelectionParticles
             GameObject savingEffect = GameObject.Instantiate<GameObject>(Assets.Prefabs.SavingObjectBounds.Get());
 
             Transform parent = poolee.transform;
-            AIBrain brain = AIBrain.Cache.Get(poolee.gameObject);
+            AIBrain? brain = Instances<AIBrain>.Get(poolee.gameObject);
             if (brain != null)
             {
-                // set to current location - AIBrain (on root AssetPoolee transform) does not move, but LiteLoco/NavMeshAgent
-                BehaviourBaseNav bbn = brain.puppetMaster.behaviours.FirstOrDefault()?.TryCast<BehaviourBaseNav>();
+                // set to current location - AIBrain (on targetTransform Poolee transform) does not move, but LiteLoco/NavMeshAgent
+                BehaviourBaseNav? bbn = brain.puppetMaster.behaviours.FirstOrDefault()?.TryCast<BehaviourBaseNav>();
                 if (bbn != null)
                     parent = bbn._navAgent.transform;
             }
@@ -116,7 +106,7 @@ internal static class SelectionParticles
             savingEffect.transform.SetParent(parent, false);
             savingEffect.transform.localPosition = Vector3.zero;
             savingEffect.transform.localRotation = Quaternion.identity;
-            savingEffect.transform.localScale = poolee.spawnableCrate.ColliderBounds.size;
+            savingEffect.transform.localScale = poolee.SpawnableCrate.ColliderBounds.size;
 
             pooleeRenderers[pId] = savingEffect.GetComponent<LaserVector>().renderers; // yes i did in fact reference smuggle using laservector
             //pooleeParticles[pId] = particles;

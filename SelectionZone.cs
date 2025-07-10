@@ -1,19 +1,5 @@
 ﻿using BoneLib;
-using Cysharp.Threading.Tasks.Internal;
-using Jevil;
-using LuxURPEssentials;
-using SLZ;
-using SLZ.Interaction;
-using SLZ.Marrow.Input;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.Utilities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnhollowerBaseLib.Attributes;
-using UnityEngine;
+using Il2CppInterop.Runtime.Attributes;
 
 namespace SceneSaverBL;
 
@@ -38,7 +24,7 @@ internal class SelectionZone : MonoBehaviour
 
     Vector3 leftPos;
     Vector3 rightPos;
-    internal Dictionary<int, AssetPoolee> pooleesInSelectionZone = new();
+    internal Dictionary<int, Poolee> pooleesInSelectionZone = new();
 
     private static bool instanceExists;
     private static SelectionZone instance;
@@ -58,16 +44,30 @@ internal class SelectionZone : MonoBehaviour
         }
     }
 
-    public static bool Active => !instance.INOC() && instance.gameObject.active;
+    public static bool Active => instance != null && instance.gameObject.active;
 
     public SelectionZone(IntPtr ptr) : base(ptr) { }
 
     void Awake()
     {
+#if DEBUG
+        var dlc = new DebugLineCounter(SceneSaverBL.instance.LoggerInstance, DebugLineCounter.Kind.LINE_NUMBER, "SelZone Awake");
+#endif
+
         instance = this;
         instanceExists = true;
+
+
+#if DEBUG
+        dlc.UpdateProgress();
+#endif
         GameObject selWire = GameObject.Instantiate(Assets.Prefabs.SelectionWire.Get());
         selWire.transform.parent = transform;
+
+
+#if DEBUG
+        dlc.UpdateProgress();
+#endif
         selectionWireSys = selWire.GetComponent<ParticleSystem>();
         selectionWireT = selWire.transform;
 
@@ -75,10 +75,22 @@ internal class SelectionZone : MonoBehaviour
         //GameObject grabbable2 = GameObject.Instantiate(SceneSaverBL.grabbablePrefab);
         //grabbableChildren = new Transform[] { grabbable1.transform.GetChild(0), grabbable2.transform.GetChild(0) };
 
+#if DEBUG
+        dlc.UpdateProgress();
+#endif
         col = gameObject.AddComponent<BoxCollider>();
         col.isTrigger = true;
 
+
+#if DEBUG
+        dlc.UpdateProgress();
+#endif
         ControllerTutorial.ShowIfUnseen();
+
+
+#if DEBUG
+        dlc.Success();
+#endif
     }
 
     void OnEnable()
@@ -113,8 +125,8 @@ internal class SelectionZone : MonoBehaviour
         SelectionParticles.Thunk();
 
         float oldSum = (leftPos + rightPos).magnitude;
-        DoPosCheck(Player.leftHand, ref leftPos);
-        DoPosCheck(Player.rightHand, ref rightPos);
+        DoPosCheck(Player.LeftHand, ref leftPos);
+        DoPosCheck(Player.RightHand, ref rightPos);
         float newSum = (leftPos + rightPos).magnitude;
         if (oldSum == newSum) return;
 
@@ -140,18 +152,23 @@ internal class SelectionZone : MonoBehaviour
     private void DoPosCheck(Hand hand, ref Vector3 pos)
     {
         bool stickClicked = hand.Controller.GetThumbStick() || Prefs.dontUseStickClick;
+        
         if (!stickClicked) return;
         HandPoseAnimator hpa = hand.Animator;
-        if (hpa._currentThumb + hpa._currentIndex + hpa._currentMiddle + hpa._currentRing + hpa._currentPinky < 4.7f) return;
+        float handSum = hpa._currentThumb + hpa._currentIndex + hpa._currentMiddle + hpa._currentRing + hpa._currentPinky;
+        if (handSum < 4.7f) return;
 
+        // dont lerp, it just makes the mod feel unresponsive
+        //float distance = Vector3.Distance(pos, hpa.transform.position);
+        //pos = Vector3.Lerp(pos, hpa.transform.position, distance / 10); // div by 10 to smooth or some shit
         pos = hpa.transform.position;
     }
 
     // send trigger events to a queue to avoid lag
     void OnTriggerEnter(Collider other)
     {
-        //SceneSaverBL.Log($"REMOVEME: ");
-        if (1 << other.gameObject.layer == (int)GameLayers.STATIC)
+        // ignore static colliders b/c they wont have poolees :)
+        if (1 << other.gameObject.layer == (int)GameLayers.BACKGROUND || !other.attachedRigidbody)
         {
             Physics.IgnoreCollision(col, other);
             return;
@@ -191,7 +208,7 @@ internal class SelectionZone : MonoBehaviour
 #if DEBUG
         catch(Exception ex) 
         {
-            SceneSaverBL.Error(ex);
+            SceneSaverBL.Error("Exception while cleaning selectionzone list! See: " + ex);
             return false;
         }
 #else
@@ -203,10 +220,25 @@ internal class SelectionZone : MonoBehaviour
     }
 
     [HideFromIl2Cpp]
-    public AssetPoolee[] GetPoolees()
+    public Poolee[] GetPoolees()
     {
         // order by y position (ascending) so that things like tables are loaded first when deserializing/initializing from save file
-        return pooleesInSelectionZone.Values.Distinct(UnityObjectComparer<AssetPoolee>.Instance).OrderBy(poolee => poolee.transform.position.y).ToArray();
+        var ret = pooleesInSelectionZone.Values.Distinct(UnityObjectComparer<Poolee>.Instance).Where(p => p != null && !SaveUtils.DontSaveTheseBarcodes.Contains(p.SpawnableCrate.Barcode.ID)).OrderBy(poolee => poolee.transform.position.y).ToArray();
+#if DEBUG
+        SceneSaverBL.Log($"When finding poolees in selection zone, started @ {pooleesInSelectionZone.Count} poolee(s), and whittled down to {ret.Length}");
+        if (ret.Length != pooleesInSelectionZone.Count)
+        {
+            SceneSaverBL.Log("Here are all the poolees that were filtered out:");
+            foreach (var pooleeInZone in pooleesInSelectionZone.Values)
+            {
+                if (ret.Contains(pooleeInZone))
+                    continue;
+
+                SceneSaverBL.Log($"    {pooleeInZone.name} from crate {pooleeInZone.SpawnableCrate.Barcode.ID}");
+            }
+        }
+#endif
+        return ret;
     }
 
     [HideFromIl2Cpp]
@@ -227,7 +259,6 @@ internal class SelectionZone : MonoBehaviour
 
         // particles and wire around selected objects are on water, and just want to ignore ui cuz someone might want their avatar to appear but BoneMenu would obscure the selection
         int layers = ~(int)GameLayers.WATER;
-        layers |= (int)GameLayers.SPAWNGUN_UI;
         layers |= (int)GameLayers.UI;
         GameObject cameraGo = new("SceneSaver Temporary Camera");
         Camera cam = cameraGo.AddComponent<Camera>();
@@ -264,7 +295,7 @@ internal class SelectionZone : MonoBehaviour
         Vector3 center = (max + min) / 2;
         float distToCenter = Vector3.Distance(max, center);
         // only care if static geo occludes camera.... but SLZ doesnt always mark colliders as static... thanks.
-        int layerMask = (int)GameLayers.STATIC;
+        int layerMask = (int)GameLayers.BACKGROUND;
         layerMask |= (int)GameLayers.DEFAULT; // include Default because SLZ loooooves putting static geo under default. what else will this break? fuck if i know.
 
         // use V3.Lerp to slightly inset from edge, in case edge is in something... but not *too* in something?
@@ -315,9 +346,9 @@ internal class SelectionZone : MonoBehaviour
 
     async Task PostEnableImpl()
     {
-        if (this.INOC()) return;
+        if (this == null) return;
         GameObject prefab = await Assets.Prefabs.SelectionWireMusic.GetAsync();
-        if (this.INOC()) return;
+        if (this == null) return;
         GameObject musPlayer = GameObject.Instantiate(prefab);
         musPlayer.transform.SetParent(transform, false);
         musPlayer.transform.localPosition = Vector3.zero;

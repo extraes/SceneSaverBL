@@ -1,16 +1,4 @@
-﻿using Jevil;
-using Jevil.Spawning;
-using SceneSaverBL.Interfaces;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-using static RootMotion.FinalIK.AimPoser;
+﻿using SceneSaverBL.Interfaces;
 
 namespace SceneSaverBL.Versions.Version5;
 
@@ -29,15 +17,7 @@ internal struct SavedTransform5 : IContextfulSavedObject<SavedTransform5, Transf
 
     public void Construct(Transform sourceTransform)
     {
-        localPos = sourceTransform.transform.localPosition;
-        scale = sourceTransform.transform.localScale;
-        localRotation = sourceTransform.transform.localRotation.eulerAngles;
-
-#if DEBUG
-        SaveChecks.ThrowIfInvalid(localPos);
-        SaveChecks.ThrowIfInvalid(localRotation);
-        SaveChecks.ThrowIfInvalid(scale);
-#endif
+        throw new NotImplementedException();
     }
 
     // cannot be async - async methods cannot modify their original instances
@@ -70,20 +50,9 @@ internal struct SavedTransform5 : IContextfulSavedObject<SavedTransform5, Transf
 #endif
     }
 
-    public async Task Write(Stream stream)
+    public Task Write(Stream stream)
     {
-        byte[] posBytes = localPos.ToBytes();
-        byte[] scaleBytes = scale.ToBytes();
-        byte[] rotBytes = localRotation.ToBytes();
-        //byte[] childrenBytes = BitConverter.GetBytes(children);
-        await stream.WriteAsync(posBytes, 0, Const.SizeV3);
-        await stream.WriteAsync(scaleBytes, 0, Const.SizeV3);
-        await stream.WriteAsync(rotBytes, 0, Const.SizeV3);
-        //await stream.WriteAsync(childrenBytes, 0, Const.SizeV3); ;
-
-#if DEBUG
-        SceneSaverBL.Log("Wrote " + ToString());
-#endif
+        throw new NotImplementedException();
     }
 
     public Task<Transform> Initialize() => throw new NotSupportedException("SavedTransform is a contextually saved object - you must initialize it with a context");
@@ -119,5 +88,10 @@ internal struct SavedTransform5 : IContextfulSavedObject<SavedTransform5, Transf
     public override string ToString()
     {
         return $"SSBL Transform V5 - LPos = {SaveUtils.ToStr(localPos)}; LRot (euler) = {SaveUtils.ToStr(localRotation)}; Scale = {SaveUtils.ToStr(scale)}";
+    }
+
+    public void Construct(Transform save, TransformInitializationContext5 ctx)
+    {
+        throw new NotImplementedException();
     }
 }

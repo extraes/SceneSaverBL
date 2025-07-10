@@ -1,14 +1,4 @@
-﻿using SLZ.Marrow.Pool;
-using SLZ.Props;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-
-namespace SceneSaverBL.Interfaces;
+﻿namespace SceneSaverBL.Interfaces;
 
 internal interface ISavedObject<TImplementor, TSavedObject> : IEquatable<TImplementor>, ISerializableStruct<TImplementor> where TImplementor : struct, ISavedObject<TImplementor, TSavedObject>
 {

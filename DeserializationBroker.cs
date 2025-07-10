@@ -1,16 +1,7 @@
 ﻿using SceneSaverBL.Exceptions;
 using SceneSaverBL.Interfaces;
 using SceneSaverBL.Versions;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.Utilities;
-using SLZ.Props;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+using System.Diagnostics;
 
 namespace SceneSaverBL;
 
@@ -20,6 +11,7 @@ internal static class DeserializationBroker
     {
         try
         {
+            // wasteful as shit, only used to read the first ~5 bytes.
             using FileStream fs = File.OpenRead(path);
 
             byte version = await SaveUtils.CheckFormatIdentifier(fs);
@@ -34,7 +26,7 @@ internal static class DeserializationBroker
         }
         catch (Exception ex)
         {
-            SceneSaverBL.Warn(ex);
+            SceneSaverBL.Warn("Failed to read save metadata from disk! " + ex);
             return new FailedSaveFile(ex);
         }
     }

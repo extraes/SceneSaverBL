@@ -3,9 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33213.308
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SceneSaverBL", "SceneSaverBL.csproj", "{C33921DC-5778-4EEC-A2D0-E0AE522CC701}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SceneSaverBL", "SceneSaverBL.csproj", "{C33921DC-5778-4EEC-A2D0-E0AE522CC701}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SceneSaverRepo", ".\SceneSaverRepo\SceneSaverRepo.csproj", "{001637B5-3E77-4BE1-9B4D-AE7313B0D976}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SceneSaverRepo", "SceneSaverRepo\SceneSaverRepo.csproj", "{001637B5-3E77-4BE1-9B4D-AE7313B0D976}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D4E7BBC0-B1CC-41E3-98BF-17D476F3A0DE}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		DupeTutorial.cs = DupeTutorial.cs
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

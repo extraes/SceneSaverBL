@@ -1,15 +1,5 @@
-﻿using BoneLib.BoneMenu.Elements;
-using SceneSaverBL.Exceptions;
+﻿using SceneSaverBL.Exceptions;
 using SceneSaverBL.Interfaces;
-using SLZ.Marrow.Pool;
-using SLZ.Props;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SceneSaverBL.Versions;
 
@@ -25,25 +15,25 @@ internal class FailedSaveFile : ISaveFile
         this.exception = ex;
     }
 
-    public Task Construct(AssetPoolee[] poolees, ConstraintTracker[] constraints)
+    public Task Construct(Poolee[] poolees, ConstraintTracker[] constraints)
     {
-        throw new NotImplementedException("A failed save file cannot serialize data");
+        throw new NotImplementedException($"Failed save file ({Path.GetFileName(path)}) cannot construct data to be serialized");
     }
 
     public Task Initialize()
     {
-        throw new NotImplementedException("A failed save file cannot deserialize data");
+        throw new NotImplementedException($"Failed save file ({Path.GetFileName(path)}) cannot initialize un-deserialized data");
     }
 
 
     public Task Read(Stream stream)
     {
-        throw new NotImplementedException("A failed save file cannot deserialize data");
+        throw new NotImplementedException($"Failed save file ({Path.GetFileName(path)}) cannot deserialize data");
     }
 
     public Task Write(Stream stream)
     {
-        throw new NotImplementedException("A failed save file cannot serialize data");
+        throw new NotImplementedException($"Failed save file ({Path.GetFileName(path)}) cannot serialize data");
     }
 
     public Task SetFilePath(string filePath)
@@ -52,10 +42,10 @@ internal class FailedSaveFile : ISaveFile
         return Task.CompletedTask;
     }
 
-    public void PopulateBoneMenu(MenuCategory category)
+    public void PopulateBoneMenu(Page page)
     {
-        SubPanelElement spe = category.CreateSubPanel(Path.GetFileNameWithoutExtension(path), Color.red);
-        SaveUtils.DefaultBoneMenuErrored(spe, GetErrorStr(exception));
+        Page failPage = page.CreatePage(Path.GetFileNameWithoutExtension(path), Color.red);
+        SaveUtils.DefaultBoneMenuErrored(failPage, GetErrorStr(exception));
     }
 
     public bool ExistsOnDisk()
@@ -75,5 +65,10 @@ internal class FailedSaveFile : ISaveFile
             IOException ioe => "File err " + ioe.Message,
             _ => "Unknown error",
         };
+    }
+
+    public (Bounds, Bounds) GetBoundsForDupeAndDisplay()
+    {
+        throw new NotImplementedException();
     }
 }

@@ -1,4 +1,4 @@
-﻿using MelonLoader;
+﻿using Jevil.Patching;
 using System.Reflection;
 using System.Resources;
 using System.Runtime.InteropServices;
@@ -23,3 +23,7 @@ using System.Runtime.InteropServices;
 // If no MelonModGameAttribute is found or any of the Values for any MelonModGame on the Mod is null or empty it will be assumed the Mod is Universal.
 // Values for MelonModGame can be found in the Game's app.info file or printed at the top of every log directly beneath the Unity version.
 [assembly: MelonGame("Stress Level Zero", "BONELAB")]
+[assembly: Ungovernable(UngovernableType.ASYNC_THREAD_ATTACH /*| UngovernableType.LOG_METHOD_EXECS*/)]
+
+[assembly: MelonOptionalDependencies("LabFusion")]
+[assembly: VerifyLoaderVersion(0, 7, 1, true)]

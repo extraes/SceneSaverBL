@@ -1,11 +1,4 @@
-﻿using Jevil;
-using Jevil.ModStats;
-using Jevil.Prefs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Jevil.ModStats;
 
 namespace SceneSaverBL;
 
@@ -15,6 +8,7 @@ internal static class Stats
 
     public static async Task SaveCreated(bool full)
     {
+        if (Prefs.disableStats) return;
         string prefix = full ? "full" : "quick";
         bool success = await StatsEntry.IncrementValueAsync(STATS_CATEGORY, prefix + "savesCreated");
 
@@ -25,6 +19,7 @@ internal static class Stats
 
     public static async Task SaveLoaded(bool full)
     {
+        if (Prefs.disableStats) return;
         string prefix = full ? "full" : "quick";
         bool success = await StatsEntry.IncrementValueAsync(STATS_CATEGORY, prefix + "savesLoaded");
 
@@ -35,6 +30,7 @@ internal static class Stats
 
     public static async Task Startup()
     {
+        if (Prefs.disableStats) return;
         // removed CreateCategories because i only needed it once to create the categories and it had passkeys! hee hee hee!
         //#if DEBUG
         //        CreateCategories();

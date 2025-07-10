@@ -1,0 +1,16 @@
+﻿global using BoneLib;
+global using BoneLib.BoneMenu;
+global using Il2CppCysharp.Threading.Tasks;
+global using Jevil;
+global using Jevil.Spawning;
+global using System.Text;
+global using UnityEngine;
+global using MelonLoader;
+global using Il2CppSLZ.Marrow;
+global using Il2Cpp;
+global using Il2CppSLZ.Marrow.Data;
+global using Il2CppSLZ.Marrow.Pool;
+global using Il2CppSLZ.Marrow.AI;
+global using DebugDraw = Jevil.IMGUI.DebugDraw;
+global using Random = UnityEngine.Random;
+global using Page = BoneLib.BoneMenu.Page;

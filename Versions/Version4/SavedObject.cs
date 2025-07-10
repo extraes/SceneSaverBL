@@ -1,19 +1,8 @@
-﻿using Jevil;
-using Jevil.Spawning;
-using SceneSaverBL.Interfaces;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using SceneSaverBL.Interfaces;
 
 namespace SceneSaverBL.Versions.Version4;
 
-internal struct SavedObject : ISavedObject<SavedObject, AssetPoolee>
+internal struct SavedObject : ISavedObject<SavedObject, Poolee>
 {
     // 12 + 12 + 8 = 32
     private Vector3 pos;
@@ -27,12 +16,12 @@ internal struct SavedObject : ISavedObject<SavedObject, AssetPoolee>
     static byte[] vector3Buffer = new byte[Const.SizeV3];
 
 
-    public void Construct(AssetPoolee poolee)
+    public void Construct(Poolee poolee)
     {
         pos = poolee.transform.position;
         scale = poolee.transform.localScale;
         rot = poolee.transform.rotation.eulerAngles;
-        barcode = poolee.spawnableCrate.Barcode.ID;
+        barcode = poolee.SpawnableCrate.Barcode.ID;
     }
 
     public void Read(Stream stream)
@@ -78,12 +67,12 @@ internal struct SavedObject : ISavedObject<SavedObject, AssetPoolee>
         await stream.WriteAsync(barcodeBytes, 0, barcodeBytes.Length);
     }
 
-    public async Task<AssetPoolee> Initialize()
+    public async Task<Poolee> Initialize()
     {
         if (barcode == "SLZ.BONELAB.Core.DefaultPlayerRig") return null;
 
         Spawnable mySpawnable = Barcodes.ToSpawnable(barcode);
-        AssetPoolee poolee = await mySpawnable.SpawnAsync(pos, Rotation);
+        Poolee poolee = await mySpawnable.SpawnAsyncS(pos, Rotation);
         poolee.transform.localScale = scale;
         return poolee;
     }

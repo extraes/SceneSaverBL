@@ -1,50 +1,36 @@
-﻿using Jevil;
-using Jevil.Spawning;
-using PuppetMasta;
+﻿using Il2CppSLZ.Marrow.PuppetMasta;
 using SceneSaverBL.Interfaces;
-using SLZ.AI;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SceneSaverBL.Versions.Version6;
 
-internal struct SavedPoolee6 : ISavedObject<SavedPoolee6, AssetPoolee>
+internal struct SavedPoolee6 : IContextfulSavedObject<SavedPoolee6, Poolee, PooleeInitializationContext6>
 {
-    // 12 + 12 + 8 = 32
     private Vector3 pos;
     private Vector3 scale;
-    private Vector3 rot;
-    private string barcode;
+    private Vector3 rotEul;
+    private int barcodeIdx;
 
-    public Vector3 Position => pos;
-    public Quaternion Rotation => Quaternion.Euler(rot);
+    public readonly Vector3 Position => pos;
+    public readonly Quaternion Rotation => Quaternion.Euler(rotEul);
 
-    static byte[] vector3Buffer = new byte[Const.SizeV3];
+    static readonly byte[] vector3Buffer = new byte[Const.SizeV3];
 
-
-    public void Construct(AssetPoolee poolee)
+    public void Construct(Poolee poolee, PooleeInitializationContext6 ctx)
     {
         Transform posrotT = poolee.transform;
-        AIBrain brain = AIBrain.Cache.Get(poolee.gameObject);
+        AIBrain? brain = Instances<AIBrain>.Get(poolee.gameObject);
         if (brain != null)
         {
-            // set to current location - AIBrain (on root AssetPoolee transform) does not move, but LiteLoco/NavMeshAgent does
-            BehaviourBaseNav bbn = brain.puppetMaster.behaviours.FirstOrDefault()?.TryCast<BehaviourBaseNav>();
+            // set to current location - AIBrain (on targetTransform Poolee transform) does not move, but LiteLoco/NavMeshAgent does
+            BehaviourBaseNav? bbn = brain.puppetMaster.behaviours.FirstOrDefault()?.TryCast<BehaviourBaseNav>();
             if (bbn != null)
                 posrotT = bbn._navAgent.transform;
         }
 
         scale = poolee.transform.localScale;
         pos = posrotT.position;
-        rot = posrotT.rotation.eulerAngles;
-        barcode = poolee.spawnableCrate.Barcode.ID;
+        rotEul = posrotT.rotation.eulerAngles;
+        barcodeIdx = ctx.barcodes.GetBarcodeIdx(poolee.SpawnableCrate.Barcode);
     }
 
     public void Read(Stream stream)
@@ -52,9 +38,7 @@ internal struct SavedPoolee6 : ISavedObject<SavedPoolee6, AssetPoolee>
         Vector3 readPos;
         Vector3 readScale;
         Vector3 readRot;
-        ushort barcodeLength;
-        string readBarcode;
-        byte[] barcodeBuffer;
+        int readBarcodeIdx;
         byte[] buffer = vector3Buffer;
 
         stream.Read(buffer, 0, Const.SizeV3);
@@ -63,15 +47,12 @@ internal struct SavedPoolee6 : ISavedObject<SavedPoolee6, AssetPoolee>
         readScale = Utilities.DebyteV3(buffer, 0);
         stream.Read(buffer, 0, Const.SizeV3);
         readRot = Utilities.DebyteV3(buffer, 0);
-        stream.Read(buffer, 0, sizeof(ushort));
-        barcodeLength = BitConverter.ToUInt16(buffer, 0);
-        barcodeBuffer = new byte[barcodeLength];
-        stream.Read(barcodeBuffer, 0, barcodeLength);
-        readBarcode = Encoding.UTF8.GetString(barcodeBuffer);
-
+        stream.Read(buffer, 0, sizeof(int));
+        readBarcodeIdx = BitConverter.ToInt32(buffer, 0);
+        
         pos = readPos;
-        rot = readRot;
-        barcode = readBarcode;
+        rotEul = readRot;
+        barcodeIdx = readBarcodeIdx;
         scale = readScale;
 
 #if DEBUG
@@ -83,42 +64,44 @@ internal struct SavedPoolee6 : ISavedObject<SavedPoolee6, AssetPoolee>
     {
         byte[] posBytes = pos.ToBytes();
         byte[] scaleBytes = scale.ToBytes();
-        byte[] rotBytes = rot.ToBytes();
-        byte[] barcodeBytes = Encoding.UTF8.GetBytes(barcode);
-        byte[] barcodeLength = BitConverter.GetBytes((ushort)barcodeBytes.Length);
+        byte[] rotBytes = rotEul.ToBytes();
+        byte[] barcodeBytes = BitConverter.GetBytes(barcodeIdx);
         await stream.WriteAsync(posBytes, 0, Const.SizeV3);
         await stream.WriteAsync(scaleBytes, 0, Const.SizeV3);
         await stream.WriteAsync(rotBytes, 0, Const.SizeV3);
 
-        await stream.WriteAsync(barcodeLength, 0, sizeof(ushort));
         await stream.WriteAsync(barcodeBytes, 0, barcodeBytes.Length);
-
 
 #if DEBUG
         SceneSaverBL.Log("Wrote: " + ToString());
 #endif
     }
 
-    public async Task<AssetPoolee> Initialize()
+    public async Task<Poolee> Initialize(PooleeInitializationContext6 ctx)
     {
-        if (barcode == "SLZ.BONELAB.Core.DefaultPlayerRig") return null;
+        string barcodeStr = ctx.barcodes.GetBarcodeStr(barcodeIdx);
 
-        Spawnable mySpawnable = Barcodes.ToSpawnable(barcode);
-        AssetPoolee poolee = await mySpawnable.SpawnAsync(pos, Rotation);
+        Spawnable mySpawnable = Barcodes.ToSpawnable(barcodeStr);
+        Poolee poolee = await mySpawnable.SpawnAsyncS(pos + ctx.offset, Rotation);
         poolee.transform.localScale = scale;
         return poolee;
     }
 
     public bool Equals(SavedPoolee6 other)
     {
-        return other.barcode == this.barcode 
+        return other.barcodeIdx == this.barcodeIdx 
             && other.pos == this.pos
-            && other.rot == this.rot
+            && other.rotEul == this.rotEul
             && other.scale == this.scale;
     }
 
     public override string ToString()
     {
-        return $"SSBL Poolee V6 - Pos = {SaveUtils.ToStr(pos)}; Rot (euler) = {SaveUtils.ToStr(rot)}; Scale = {SaveUtils.ToStr(scale)}; Barcode = {barcode}";
+        return $"SSBL Poolee V6 - Pos = {SaveUtils.ToStr(pos)}; Rot (euler) = {SaveUtils.ToStr(rotEul)}; Scale = {SaveUtils.ToStr(scale)}; Barcode Index = {barcodeIdx}";
+    }
+
+    public string GetBarcodeStr(StringCollection6 stringCollection)
+    {
+        return stringCollection.GetBarcodeStr(barcodeIdx);
     }
 }

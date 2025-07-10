@@ -1,14 +1,5 @@
-﻿using Cysharp.Threading.Tasks;
-using Jevil;
-using SLZ.Bonelab;
-using SLZ.VRMK;
-using System;
-using System.Collections.Generic;
+﻿using Il2CppSLZ.Bonelab;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SceneSaverBL;
 
@@ -19,7 +10,7 @@ static internal class Screenshotting
         // depth of 0 causes sorting issues on quest, see: https://discord.com/channels/563139253542846474/724595991675797554/1081754179606953984
         // idk why it doesnt on pc, maybe because pc isnt dogshit :D
         int depth = Utilities.IsPlatformQuest() ? 32 : 0;
-        RenderTexture previewTex = new(Prefs.previewSize, Prefs.previewSize, depth);
+        RenderTexture previewTex = new(ConfigVars.previewSize, ConfigVars.previewSize, depth);
         cam.targetTexture = previewTex;
 
         // wait one frame after creating textures - we dont want to halt main thread for too long
@@ -29,13 +20,14 @@ static internal class Screenshotting
         Stopwatch sw = Stopwatch.StartNew();
 #endif
         // enable hair and disable prefs UI because avatar hair looks good and the preferences view obscures the view if the player is inside the selection area
-        Instances<PlayerAvatarArt>.Get(Instances.Player_RigManager.gameObject).EnableHair();
-        Instances.Player_RigManager.uiRig.popUpMenu.preferencesPanelView.gameObject.SetActive(false);
+        Instances<PlayerAvatarArt>.Get(Instances.Player_RigManager.gameObject)?.EnableHair();
+        Player.UIRig.popUpMenu.preferencesPanelView.gameObject.SetActive(false);
         cam.Render();
-        Instances.Player_RigManager.uiRig.popUpMenu.preferencesPanelView.gameObject.SetActive(true);
-        Instances<PlayerAvatarArt>.Get(Instances.Player_RigManager.gameObject).DisableHair();
+        Player.UIRig.popUpMenu.preferencesPanelView.gameObject.SetActive(true);
+        Instances<PlayerAvatarArt>.Get(Instances.Player_RigManager.gameObject)?.DisableHair();
 #if DEBUG
         SceneSaverBL.Log($"Rendering preview from camera took {sw.ElapsedTicks / 10000f}ms");
+        sw.Restart();
 #endif
         // rendering is a slow operation, wait another frame
         await UniTask.Yield();
@@ -92,7 +84,7 @@ static internal class Screenshotting
         GameObject polaroid = GameObject.Instantiate(polaroidBase);
         polaroid.transform.position = pos;
         polaroid.transform.rotation = rot;
-        polaroid.GetComponent<SaveIndication>().material.SetTexture(Const.UrpLitMainTexID, texture);
+        polaroid.GetComponent<SecurityCamera>().material.SetTexture(Const.UrpLitMainTexID, texture);
         polaroid.SetActive(true);
         return polaroid;
     }

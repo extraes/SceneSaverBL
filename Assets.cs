@@ -1,12 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
-using Jevil;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
+﻿using System.Diagnostics;
 
 namespace SceneSaverBL;
 
@@ -25,8 +17,11 @@ internal static class Assets
         internal static readonly BundledAsset<GameObject> Polaroid = new("Assets/SceneSaver/PreviewPolaroid.prefab");
         internal static readonly BundledAsset<GameObject> FullsavePreviewBounds = new("Assets/SceneSaver/FullsaveBounds.prefab");
         internal static readonly BundledAsset<GameObject> ControllerTutorial = new("Assets/SceneSaver/Tutorial/ControllerTutorial.prefab");
+        internal static readonly BundledAsset<GameObject> Laser = new("Assets/SceneSaver/Laser.prefab");
+        internal static readonly BundledAsset<GameObject> GroundCircle = new("Assets/SceneSaver/GroundCircle.prefab");
+        internal static readonly BundledAsset<GameObject> DupeTutorial = new("Assets/SceneSaver/Tutorial/DupeTutorial.prefab");
     }
-    
+
     internal static class Materials
     {
         internal static readonly BundledAsset<Material> SavingObjectCompletedMaterial = new("Assets/SceneSaver/BoundsLinesSAVED.mat");
@@ -39,7 +34,7 @@ internal static class Assets
         SceneSaverBL.Log("Loading assets...");
 #endif
         string resourcePath = "SceneSaverBL.Resources.Resources" + (Utilities.IsPlatformQuest() ? "Quest.bundle" : ".bundle");
-        byte[] bundleBytes = null;
+        byte[] bundleBytes = null!;
         SceneSaverBL.instance.MelonAssembly.Assembly.UseEmbeddedResource(resourcePath, bytes => bundleBytes = bytes);
 
         bundle = await AssetBundle.LoadFromMemoryAsync(bundleBytes).ToTask();
@@ -59,6 +54,9 @@ internal static class Assets
         await Prefabs.Polaroid.BindAsync(bundle);
         await Prefabs.FullsavePreviewBounds.BindAsync(bundle);
         await Prefabs.ControllerTutorial.BindAsync(bundle);
+        await Prefabs.Laser.BindAsync(bundle);
+        await Prefabs.GroundCircle.BindAsync(bundle);
+        await Prefabs.DupeTutorial.BindAsync(bundle);
 
         await Materials.SavingObjectCompletedMaterial.BindAsync(bundle);
 

@@ -1,16 +1,5 @@
-﻿using Jevil;
-using SceneSaverBL.Exceptions;
-using SLZ.Marrow.Pool;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
+﻿using SceneSaverBL.Exceptions;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SceneSaverBL;
 
@@ -35,17 +24,17 @@ internal static class SaveChecks
         return tName.StartsWith(CONSTRAINT_NAME_START) || tName.StartsWith(SAVING_BOUNDS_NAME);
     }
 
-    public static bool IsHierarchyConsistent(AssetPoolee poolee)
+    public static bool IsHierarchyConsistent(Poolee poolee)
     {
 #if DEBUG
         using var ps = new ProfilingScope(SceneSaverBL.instance.LoggerInstance, ProfilingScope.ProfilingType.STOPWATCH_EXECUTION_TIME, "Hierarchy consistency");
 #endif
-        string barcode = poolee.spawnableCrate.Barcode.ID;
+        string barcode = poolee.SpawnableCrate.Barcode.ID;
 
         if (HierarchyMatchCache.TryGetValue(barcode, out bool cachedConsistent))
             return cachedConsistent;
 
-        Hash128 hierarchyHashPrefab = HierarchyHash(poolee.spawnableCrate.MainGameObject.Asset.transform);
+        Hash128 hierarchyHashPrefab = HierarchyHash(poolee.SpawnableCrate.MainGameObject.Asset.transform);
 
 #if DEBUG
         ps.Log();
@@ -130,6 +119,12 @@ internal static class SaveChecks
         encoder ??= Encoding.UTF8;
         int byteCount = encoder.GetByteCount(strToCheck);
         if (byteCount > byte.MaxValue) LogThrow(new StringTooLongException($"String is too long to be serialized ({byteCount} is greater than max 255 characters). Report this error to the developer (or maybe shorten barcode)! String: " + strToCheck));
+    }
+
+    internal static void ThrowIfLongerThanByte(Array arr, string arrayPurpose)
+    {
+        int byteCount = arr.Length;
+        if (byteCount > byte.MaxValue) LogThrow(new ArrayTooLongException($"Array is too long to be serialized ({byteCount} is greater than max length 255). Report this error to the developer! The array used for: " + arrayPurpose));
     }
 
     private static void LogThrow(Exception ex)

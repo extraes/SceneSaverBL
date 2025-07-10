@@ -1,21 +1,9 @@
-﻿using Jevil;
-using Jevil.Spawning;
-using PuppetMasta;
+﻿using Il2CppSLZ.Marrow.PuppetMasta;
 using SceneSaverBL.Interfaces;
-using SLZ.AI;
-using SLZ.Marrow.Data;
-using SLZ.Marrow.Pool;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SceneSaverBL.Versions.Version5;
 
-internal struct SavedPoolee5 : ISavedObject<SavedPoolee5, AssetPoolee>
+internal struct SavedPoolee5 : ISavedObject<SavedPoolee5, Poolee>
 {
     // 12 + 12 + 8 = 32
     private Vector3 pos;
@@ -29,14 +17,14 @@ internal struct SavedPoolee5 : ISavedObject<SavedPoolee5, AssetPoolee>
     static byte[] vector3Buffer = new byte[Const.SizeV3];
 
 
-    public void Construct(AssetPoolee poolee)
+    public void Construct(Poolee poolee)
     {
         Transform posrotT = poolee.transform;
-        AIBrain brain = AIBrain.Cache.Get(poolee.gameObject);
+        AIBrain? brain = Instances<AIBrain>.Get(poolee.gameObject);
         if (brain != null)
         {
-            // set to current location - AIBrain (on root AssetPoolee transform) does not move, but LiteLoco/NavMeshAgent does
-            BehaviourBaseNav bbn = brain.puppetMaster.behaviours.FirstOrDefault()?.TryCast<BehaviourBaseNav>();
+            // set to current location - AIBrain (on targetTransform Poolee transform) does not move, but LiteLoco/NavMeshAgent does
+            BehaviourBaseNav? bbn = brain.puppetMaster.behaviours.FirstOrDefault()?.TryCast<BehaviourBaseNav>();
             if (bbn != null)
                 posrotT = bbn._navAgent.transform;
         }
@@ -44,7 +32,7 @@ internal struct SavedPoolee5 : ISavedObject<SavedPoolee5, AssetPoolee>
         scale = poolee.transform.localScale;
         pos = posrotT.position;
         rot = posrotT.rotation.eulerAngles;
-        barcode = poolee.spawnableCrate.Barcode.ID;
+        barcode = poolee.SpawnableCrate.Barcode.ID;
     }
 
     public void Read(Stream stream)
@@ -99,12 +87,12 @@ internal struct SavedPoolee5 : ISavedObject<SavedPoolee5, AssetPoolee>
 #endif
     }
 
-    public async Task<AssetPoolee> Initialize()
+    public async Task<Poolee> Initialize()
     {
         if (barcode == "SLZ.BONELAB.Core.DefaultPlayerRig") return null;
 
         Spawnable mySpawnable = Barcodes.ToSpawnable(barcode);
-        AssetPoolee poolee = await mySpawnable.SpawnAsync(pos, Rotation);
+        Poolee poolee = await mySpawnable.SpawnAsyncS(pos, Rotation);
         poolee.transform.localScale = scale;
         return poolee;
     }

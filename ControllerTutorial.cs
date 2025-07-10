@@ -1,10 +1,7 @@
 ﻿using BoneLib;
-using Jevil;
+using Il2CppSLZ.MLAgents;
 using Jevil.Tweening;
 using Jevil.Waiting;
-using MelonLoader;
-using System.Threading.Tasks;
-using UnityEngine;
 
 namespace SceneSaverBL;
 
@@ -27,25 +24,25 @@ public class ControllerTutorial : MonoBehaviour
         tutorialCurrentlyActive = !hideFlags.HasFlag(HideFlags.DontUnloadUnusedAsset);
         startTime = Time.timeAsDouble;
         CallDelayed.CallAction(Disappearize, 40);
-        handL = Player.leftHand.transform;
-        handR = Player.rightHand.transform;
-        AutoAgroBoid aab = GetComponent<AutoAgroBoid>(); // reference smuggled a gameobject array
+        handL = Player.LeftHand.transform;
+        handR = Player.RightHand.transform;
+        AutoAgroBoid refSmuggler = GetComponent<AutoAgroBoid>(); // reference smuggled a gameobject array
 
-        for (int i = 0; i < aab.betweenAgroWaypoints.Length; i++)
-            aab.betweenAgroWaypoints[i].SetActive(false);
+        for (int i = 0; i < refSmuggler.betweenAgroWaypoints.Length; i++)
+            refSmuggler.betweenAgroWaypoints[i].SetActive(false);
 
 
         int start;
         int end;
-        switch (Player.controllerRig.leftController.Type)
+        switch (Player.ControllerRig.leftController.Type)
         {
-            case SLZ.Marrow.Input.XRControllerType.Index:
-                start = aab.bumperUpdateRate;
-                end = aab.bumperUpdateRate * 2;
+            case Il2CppSLZ.Marrow.Input.XRControllerType.Index:
+                start = refSmuggler.bumperUpdateRate;
+                end = refSmuggler.bumperUpdateRate * 2;
                 break;
             default:
                 start = 0;
-                end = aab.bumperUpdateRate;
+                end = refSmuggler.bumperUpdateRate;
                 break;
         }
 
@@ -54,9 +51,9 @@ public class ControllerTutorial : MonoBehaviour
 #if DEBUG
             SceneSaverBL.Log("Enabling idx " + i);
 #endif
-            aab.betweenAgroWaypoints[i].SetActive(true);
+            refSmuggler.betweenAgroWaypoints[i].SetActive(true);
 #if DEBUG
-            SceneSaverBL.Log("Enabled " + aab.betweenAgroWaypoints[i].name);
+            SceneSaverBL.Log("Enabled " + refSmuggler.betweenAgroWaypoints[i].name);
 #endif
         }
     }
@@ -64,7 +61,7 @@ public class ControllerTutorial : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        Transform head = Player.playerHead.transform;
+        Transform head = Player.Head.transform;
         Vector3 handMidpoint = Vector3.Lerp(handL.position, handR.position, 0.5f);
         Vector3 dirAbnormal = head.forward + new Vector3(0, 0.25f, 0); // dirNotNormalized wasnt as short. lol.
         Vector3 dir = dirAbnormal.normalized;

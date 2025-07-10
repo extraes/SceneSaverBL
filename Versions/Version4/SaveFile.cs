@@ -1,19 +1,4 @@
-﻿using Cysharp.Threading.Tasks;
-using Jevil.Spawning;
-using Jevil;
-using RootMotion.FinalIK;
-using SLZ.Marrow.Pool;
-using SLZ.Marrow.SceneStreaming;
-using SLZ.Props;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-using System.IO;
-using BoneLib.BoneMenu.Elements;
-using BoneLib.BoneMenu;
+﻿using Il2CppSLZ.Marrow.SceneStreaming;
 using SceneSaverBL.Interfaces;
 
 namespace SceneSaverBL.Versions.Version4;
@@ -22,14 +7,14 @@ internal class SaveFile : ISaveFile
 {
 
     string path;
-    MenuCategory infoCategory;
+    Page infoCategory;
     internal string levelBarcode;
     private Texture2D preview;
     private byte[] previewBytes;
     private int objectCount;
     private int constraintCount;
     internal SavedObject[] objects;
-    private AssetPoolee[] initializedObjects; // need for constraints
+    private Poolee[] initializedObjects; // need for constraints
     internal SavedConstraint[] constraints;
     ConstraintTracker[] initializedTrackers;
     Constrainer constrainer;
@@ -84,19 +69,19 @@ internal class SaveFile : ISaveFile
         constrainer = await SaveUtils.GetDummyConstrainer();
         SceneSaverBL.Log("Retrieved dummy constrainer " + constrainer.name);
 
-        initializedObjects = new AssetPoolee[objectCount];
+        initializedObjects = new Poolee[objectCount];
         initializedTrackers = new ConstraintTracker[constraintCount];
 
         // timeslicing poolee may cause things to clip into/fall through things like tables before the table is intitialized... do i bother ordering poolees by pos y-value when saving?
         SceneSaverBL.Log($"Created variable arrays: {initializedObjects.Length} object(s), {initializedTrackers.Length} constraint(s). Now time-slicing poolee init");
-        await AsyncUtilities.ForTimeSlice(0, (int)objectCount, InitializePoolee, Prefs.timeSliceMs);
+        await AsyncUtilities.ForTimeSlice(0, (int)objectCount, InitializePoolee, ConfigVars.timeSliceMs);
         SceneSaverBL.Log("Poolee init successful. Now time-slicing constraint init");
-        await AsyncUtilities.ForTimeSlice(0, (int)constraintCount, InitializeConstraint, Prefs.timeSliceMs);
+        await AsyncUtilities.ForTimeSlice(0, (int)constraintCount, InitializeConstraint, ConfigVars.timeSliceMs);
 
         if (Prefs.freezeWhileLoading)
         {
             SceneSaverBL.Log("Constraint init successful. Now time-slicing kinematics reset.");
-            await AsyncUtilities.ForEachTimeSlice(preFreezeKinematics, ResetKinematics, Prefs.timeSliceMs);
+            await AsyncUtilities.ForEachTimeSlice(preFreezeKinematics, ResetKinematics, ConfigVars.timeSliceMs);
             preFreezeKinematics.Clear();
         }
     }
@@ -130,7 +115,7 @@ internal class SaveFile : ISaveFile
 
     void ResetKinematics(KeyValuePair<Rigidbody, bool> kvp)
     {
-        if (kvp.Key.INOC()) return;
+        if (kvp.Key == null) return;
         kvp.Key.isKinematic = kvp.Value;
     }
 
@@ -142,35 +127,36 @@ internal class SaveFile : ISaveFile
         await Read(fs);
     }
 
-    public void PopulateBoneMenu(MenuCategory category)
+    public void PopulateBoneMenu(Page savesCategory)
     {
         if (string.IsNullOrEmpty(path)) throw new InvalidOperationException("Path must be set before populating BoneMenu");
         
-        infoCategory = category.CreateCategory("Info: " + Path.GetFileName(path), Color.white);
-        category.Elements.Remove(infoCategory);
-        SubPanelElement panel = category.CreateSubPanel(Path.GetFileNameWithoutExtension(path), Color.yellow);
-        panel.CreateFunctionElement($"Old file (Ver {Version})", Color.yellow, SaveUtils.NothingAction);
-        panel.CreateFunctionElement("Open File Menu", Color.white, OpenMenu);
+        infoCategory = new("Info: " + Path.GetFileName(path), Color.white);
+        infoCategory.Parent = savesCategory;
+        
+        Page myPage = savesCategory.CreatePage(Path.GetFileNameWithoutExtension(path), Color.yellow);
+        myPage.CreateFunction($"Old file (V{Version})", Color.yellow, SaveUtils.NothingAction);
+        myPage.CreateFunction("Open File Menu", Color.white, OpenMenu);
     }
 
     void OpenMenu()
     {
         if (infoCategory.Elements.Count != 0)
         {
-            MenuManager.SelectCategory(infoCategory);
+            Menu.OpenPage(infoCategory);
             return;
         }
 
         try
         {
             if (levelBarcode != SceneStreamer.Session.Level.Barcode.ID)
-                infoCategory.CreateFunctionElement("Incorrect level", Color.yellow, SaveUtils.NothingAction);
+                infoCategory.CreateFunction("Incorrect level", Color.yellow, SaveUtils.NothingAction);
 
-            infoCategory.CreateFunctionElement(objectCount + " obj(s)", Color.white, SaveUtils.NothingAction);
-            infoCategory.CreateFunctionElement("Load", Color.white, MenuLoad);
-            infoCategory.CreateFunctionElement("Preview", Color.white, MenuPreview);
-            infoCategory.CreateFunctionElement("Delete", Color.red, () => SaveUtils.DeleteSave(path));
-            MenuManager.SelectCategory(infoCategory);
+            infoCategory.CreateFunction(objectCount + " obj(s)", Color.white, SaveUtils.NothingAction);
+            infoCategory.CreateFunction("Load", Color.white, MenuLoad);
+            infoCategory.CreateFunction("Preview", Color.white, MenuPreview);
+            infoCategory.CreateFunction("Delete", Color.red, () => SaveUtils.DeleteSave(path));
+            Menu.OpenPage(infoCategory);
         }
         catch (Exception ex)
         {
@@ -191,7 +177,7 @@ internal class SaveFile : ISaveFile
 
     async Task MenuPreviewImpl()
     {
-        if (preview.INOC())
+        if (preview == null)
         {
             preview = new Texture2D(2, 2);
             ImageConversion.LoadImage(preview, previewBytes);
@@ -211,7 +197,7 @@ internal class SaveFile : ISaveFile
         return File.Exists(path);
     }
 
-    public Task Construct(AssetPoolee[] poolees, ConstraintTracker[] constraints)
+    public Task Construct(Poolee[] poolees, ConstraintTracker[] constraints)
     {
         throw new NotSupportedException("Save files of version " + Version + " cannot be created. Create files of a newer version.");
     }
@@ -219,5 +205,15 @@ internal class SaveFile : ISaveFile
     public Task Write(Stream stream)
     {
         throw new NotSupportedException("Save files of version " + Version + " cannot be created. Create files of a newer version.");
+    }
+
+    public (Bounds, Bounds) GetBoundsForDupeAndDisplay()
+    {
+        if (objects.Length == 0)
+            return (new Bounds(Vector3.zero, Vector3.one * 10), new Bounds(Vector3.zero, Vector3.one * 10));
+        Bounds bounds = new(objects[0].Position, Vector3.zero);
+        foreach (SavedObject obj in objects)
+            bounds.Encapsulate(obj.Position);
+        return (bounds, bounds);
     }
 }
